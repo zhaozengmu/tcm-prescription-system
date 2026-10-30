@@ -25,6 +25,7 @@
             <a href="{% url 'prescriptions:prescription_list' %}" class="btn btn-sm btn-outline-primary me-2">处方</a>
             <a href="{% url 'patients:patient_list' %}" class="btn btn-sm btn-outline-info me-2">患者</a>
             <a href="{% url 'reviews:workbench' %}" class="btn btn-sm btn-outline-warning me-2">审核</a>
+            <a href="{% url 'reviews:notifications' %}" class="btn btn-sm btn-outline-secondary me-2">🔔 通知</a>
             <a href="{% url 'users:logout' %}" class="btn btn-sm btn-outline-danger">退出</a>
         </div>
         {% endif %}

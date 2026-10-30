@@ -104,3 +104,18 @@ class StateMachineTests(TestCase):
         old_version = self.presc.version
         state_machine.transition(self.presc, "resubmit")
         self.assertEqual(self.presc.version, old_version + 1)
+
+    def test_two_level_review_flow(self):
+        """初审/复审两级审核流程。"""
+        state_machine.transition(self.presc, "submit")       # DRAFT -> SUBMITTED
+        state_machine.transition(self.presc, "precheck_pass")  # -> PRECHECKED
+        state_machine.transition(self.presc, "claim")        # -> REVIEWING（初审中）
+        ok, target = state_machine.transition(self.presc, "approve")  # 初审通过
+        self.assertTrue(ok)
+        self.assertEqual(target, "FINAL_REVIEWING")          # 进入复审中
+        ok, target = state_machine.transition(self.presc, "approve")  # 复审通过
+        self.assertTrue(ok)
+        self.assertEqual(target, "APPROVED")                 # 归档
+        ok, target = state_machine.transition(self.presc, "dispense")  # 发药
+        self.assertTrue(ok)
+        self.assertEqual(target, "DISPENSED")

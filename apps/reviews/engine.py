@@ -23,7 +23,7 @@ def _load_rules():
     if rules is None:
         from apps.prescriptions.models import AuditRule
         rules = list(AuditRule.objects.filter(is_active=True).values(
-            "id", "rule_no", "rule_type", "herbs", "level", "message", "version"
+            "id", "rule_no", "rule_type", "herbs", "level", "scope", "message", "version", "basis"
         ))
         cache.set(cache_key, rules, timeout=300)
     return rules
@@ -52,7 +52,10 @@ def precheck_prescription(prescription):
     patient = prescription.patient
     pregnancy = patient.pregnancy_status if patient else "NONE"
 
-    rules = _load_rules()
+    # 按处方类型过滤规则适用范围：门诊处方用 ALL+OUTPATIENT，住院处方用 ALL+INPATIENT
+    presc_scope = "INPATIENT" if prescription.presc_type == "INPATIENT" else "OUTPATIENT"
+    rules = [r for r in _load_rules() if r.get("scope", "ALL") in ("ALL", presc_scope)]
+
     hits = []
     blocked = False
 

@@ -3,11 +3,11 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
 from django.utils import timezone
-from django.db.models import Count, Sum, Q
+from django.db.models import Count, Sum, Q, F
 from datetime import timedelta
 import json
 
-from apps.prescriptions.models import Prescription, PrescriptionItem, Herb
+from apps.prescriptions.models import Prescription, PrescriptionItem, Herb, HerbBatch
 from apps.users.permissions import has_permission
 from apps.reviews.models import ReviewRecord
 
@@ -22,7 +22,8 @@ def dashboard(request):
         created_at__date=today, is_deleted=False
     ).count()
     pending_review = Prescription.objects.filter(
-        status__in=["SUBMITTED", "PRECHECKED", "ALERTED", "REVIEWING"], is_deleted=False
+        status__in=["SUBMITTED", "PRECHECKED", "ALERTED", "REVIEWING", "FINAL_REVIEWING"],
+        is_deleted=False,
     ).count()
     rejected = Prescription.objects.filter(status="REJECTED", is_deleted=False).count()
     total_presc = Prescription.objects.filter(is_deleted=False).count()
@@ -50,6 +51,24 @@ def dashboard(request):
         .order_by("-total")[:10]
     )
 
+    # 驳回原因统计 Top N
+    reject_reasons = list(
+        ReviewRecord.objects.filter(reject_reason__isnull=False)
+        .exclude(reject_reason="")
+        .values("reject_reason")
+        .annotate(cnt=Count("id"))
+        .order_by("-cnt")[:10]
+    )
+
+    # 近效期药材预警（90 天内到期）
+    near_expiry = HerbBatch.objects.filter(
+        expire_at__lte=today + timedelta(days=90),
+        expire_at__gte=today,
+    ).select_related("herb", "supplier")[:20]
+
+    # 库存短缺预警
+    stock_shortage = Herb.objects.filter(stock__lte=F("stock_warning"), stock_warning__gt=0)[:20]
+
     context = {
         "today_presc": today_presc,
         "pending_review": pending_review,
@@ -58,6 +77,9 @@ def dashboard(request):
         "trend": trend,
         "doctor_rank": doctor_rank,
         "herb_top": herb_top,
+        "reject_reasons": reject_reasons,
+        "near_expiry": near_expiry,
+        "stock_shortage": stock_shortage,
     }
     return render(request, "stats/dashboard.html", context)
 
@@ -106,16 +128,31 @@ def api_stats_overview(request):
         .values("herb__name").annotate(total=Sum("dose")).order_by("-total")[:10]
     )
 
+    # 驳回原因统计
+    reject_reasons = list(
+        ReviewRecord.objects.filter(reject_reason__isnull=False)
+        .exclude(reject_reason="")
+        .values("reject_reason").annotate(cnt=Count("id")).order_by("-cnt")[:10]
+    )
+    # 近效期与库存预警
+    near_expiry = HerbBatch.objects.filter(
+        expire_at__lte=today + timedelta(days=90), expire_at__gte=today,
+    ).count()
+    stock_shortage = Herb.objects.filter(stock__lte=F("stock_warning"), stock_warning__gt=0).count()
+
     return JsonResponse({
         "code": 200, "message": "ok",
         "data": {
             "today_presc": Prescription.objects.filter(created_at__date=today, is_deleted=False).count(),
-            "pending_review": Prescription.objects.filter(status__in=["SUBMITTED", "PRECHECKED", "ALERTED", "REVIEWING"], is_deleted=False).count(),
+            "pending_review": Prescription.objects.filter(status__in=["SUBMITTED", "PRECHECKED", "ALERTED", "REVIEWING", "FINAL_REVIEWING"], is_deleted=False).count(),
             "rejected": Prescription.objects.filter(status="REJECTED", is_deleted=False).count(),
             "total_presc": Prescription.objects.filter(is_deleted=False).count(),
             "trend": trend,
             "doctor_rank": doctor_rank,
             "herb_top": herb_top,
+            "reject_reasons": reject_reasons,
+            "near_expiry": near_expiry,
+            "stock_shortage": stock_shortage,
         },
     })
 

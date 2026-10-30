@@ -9,16 +9,26 @@ from django.utils import timezone
 
 
 class Herb(models.Model):
-    """药材目录（中药字典）。"""
+    """药材目录（中药字典）。
+
+    支持道地药材产地溯源、炮制规格、功效主治、库存与近效期管理，
+    拼音首字母用于医师开方高频检索（如输入 GC 检索甘草）。
+    """
 
     name = models.CharField("药材名称", max_length=64, unique=True)
     pinyin = models.CharField("拼音", max_length=100, blank=True)
+    pinyin_initial = models.CharField("拼音首字母", max_length=16, blank=True, db_index=True)
     category = models.CharField("类别", max_length=32, blank=True)
     property = models.CharField("性味归经", max_length=100, blank=True)
+    efficacy = models.CharField("功效主治", max_length=200, blank=True)
+    origin = models.CharField("道地产地", max_length=64, blank=True)
+    processing = models.CharField("炮制规格", max_length=64, blank=True)
     max_dose = models.DecimalField("剂量上限(g)", max_digits=8, decimal_places=2, null=True, blank=True)
     is_toxic = models.BooleanField("是否毒性药材", default=False)
     default_dose = models.DecimalField("常用剂量(g)", max_digits=8, decimal_places=2, null=True, blank=True)
     unit = models.CharField("单位", max_length=8, default="g")
+    stock = models.DecimalField("库存数量(kg)", max_digits=12, decimal_places=2, default=0)
+    stock_warning = models.DecimalField("库存预警线(kg)", max_digits=12, decimal_places=2, default=0)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
 
     class Meta:
@@ -27,6 +37,56 @@ class Herb(models.Model):
 
     def __str__(self):
         return self.name
+
+    def is_stock_shortage(self):
+        """库存是否低于预警线。"""
+        return self.stock <= self.stock_warning
+
+
+class Supplier(models.Model):
+    """药材供应商（供货药企），用于溯源。"""
+
+    name = models.CharField("供应商名称", max_length=128, unique=True)
+    license_no = models.CharField("经营许可证号", max_length=64, blank=True)
+    contact = models.CharField("联系人", max_length=64, blank=True)
+    phone = models.CharField("联系电话", max_length=32, blank=True)
+    address = models.CharField("地址", max_length=200, blank=True)
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "药材供应商"
+        verbose_name_plural = "药材供应商"
+
+    def __str__(self):
+        return self.name
+
+
+class HerbBatch(models.Model):
+    """药材入库批次，支持批次管理与近效期预警。"""
+
+    herb = models.ForeignKey(Herb, on_delete=models.CASCADE, related_name="batches", verbose_name="药材")
+    batch_no = models.CharField("批次号", max_length=64)
+    supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="供应商")
+    inbound_at = models.DateTimeField("入库时间", null=True, blank=True)
+    expire_at = models.DateField("有效期至", null=True, blank=True)
+    quantity = models.DecimalField("入库数量(kg)", max_digits=12, decimal_places=2, default=0)
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "药材入库批次"
+        verbose_name_plural = "药材入库批次"
+        unique_together = ("herb", "batch_no")
+
+    def __str__(self):
+        return f"{self.herb.name} - {self.batch_no}"
+
+    @property
+    def is_near_expiry(self):
+        """是否近效期（90 天内到期）。"""
+        if not self.expire_at:
+            return False
+        days = (self.expire_at - timezone.now().date()).days
+        return 0 <= days <= 90
 
 
 class FormulaTemplate(models.Model):
@@ -82,13 +142,19 @@ class AuditRule(models.Model):
         ("block", "强制拦截"),
         ("warn", "预警提示"),
     ]
+    SCOPE_CHOICES = [
+        ("ALL", "通用"),
+        ("OUTPATIENT", "门诊"),
+        ("INPATIENT", "住院"),
+    ]
 
     rule_no = models.CharField("规则编号", max_length=32, unique=True)
     rule_type = models.CharField("规则类型", max_length=8, choices=RULE_TYPE_CHOICES)
     herbs = models.CharField("涉及药材（逗号分隔）", max_length=200, blank=True)
     level = models.CharField("触发等级", max_length=8, choices=LEVEL_CHOICES, default="warn")
+    scope = models.CharField("适用范围", max_length=16, choices=SCOPE_CHOICES, default="ALL")
     message = models.CharField("提示文案", max_length=200)
-    basis = models.CharField("依据", max_length=100, blank=True)
+    basis = models.CharField("引用依据（药典版本/规范文号）", max_length=200, blank=True)
     version = models.CharField("版本", max_length=16, default="V1.0")
     is_active = models.BooleanField("是否启用", default=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
@@ -109,15 +175,20 @@ class Prescription(models.Model):
         ("SUBMITTED", "待预审"),
         ("PRECHECKED", "已预审"),
         ("ALERTED", "预警拦截"),
-        ("REVIEWING", "复核中"),
+        ("REVIEWING", "初审中"),
+        ("FINAL_REVIEWING", "复审中"),
         ("APPROVED", "已通过"),
         ("REJECTED", "已驳回"),
         ("DISPENSED", "已发药完结"),
     ]
     TYPE_CHOICES = [
-        ("GENERAL", "普通处方"),
-        ("DECOCTION", "汤剂处方"),
-        ("GRANULE", "颗粒剂处方"),
+        ("OUTPATIENT", "门诊处方"),
+        ("INPATIENT", "住院处方"),
+        ("DECOCTION", "代煎处方"),
+    ]
+    PAY_STATUS_CHOICES = [
+        ("UNPAID", "未缴费"),
+        ("PAID", "已缴费"),
     ]
 
     presc_no = models.CharField("处方号", max_length=32, unique=True)
@@ -129,8 +200,13 @@ class Prescription(models.Model):
     )
     diagnosis = models.CharField("诊断", max_length=200, blank=True)
     syndrome = models.CharField("辨证结论", max_length=200, blank=True)
-    presc_type = models.CharField("处方类型", max_length=16, choices=TYPE_CHOICES, default="GENERAL")
+    presc_type = models.CharField("处方类型", max_length=16, choices=TYPE_CHOICES, default="OUTPATIENT")
     status = models.CharField("状态", max_length=16, choices=STATUS_CHOICES, default="DRAFT", db_index=True)
+    pay_status = models.CharField("缴费状态", max_length=16, choices=PAY_STATUS_CHOICES, default="UNPAID")
+    # 代煎处方字段
+    decoction_note = models.CharField("代煎备注", max_length=200, blank=True)
+    pickup_time = models.DateTimeField("取药时间", null=True, blank=True)
+    pickup_person = models.CharField("取药人", max_length=64, blank=True)
     version = models.IntegerField("版本号（乐观锁）", default=1)
     is_deleted = models.BooleanField("逻辑删除", default=False)
     created_at = models.DateTimeField("创建时间", auto_now_add=True, db_index=True)

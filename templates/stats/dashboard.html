@@ -66,6 +66,49 @@
             </table>
         </div>
     </div>
+    <div class="col-md-6">
+        <div class="card p-3">
+            <h6>审核驳回原因统计 Top 10</h6>
+            <table class="table table-sm table-striped">
+                <thead><tr><th>驳回原因</th><th>次数</th></tr></thead>
+                <tbody>
+                {% for r in reject_reasons %}
+                    <tr><td>{{ r.reject_reason }}</td><td>{{ r.cnt }}</td></tr>
+                {% empty %}
+                    <tr><td colspan="2" class="text-muted">暂无驳回记录</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card p-3">
+            <h6>⚠️ 库存与效期预警</h6>
+            {% if stock_shortage %}
+                <div class="mb-3">
+                    <div class="text-danger fw-bold mb-1">库存短缺（低于预警线）</div>
+                    <ul class="small mb-0">
+                    {% for h in stock_shortage %}
+                        <li>{{ h.name }}：库存 {{ h.stock }}kg，预警线 {{ h.stock_warning }}kg</li>
+                    {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+            {% if near_expiry %}
+                <div>
+                    <div class="text-warning fw-bold mb-1">近效期药材（90 天内到期）</div>
+                    <ul class="small mb-0">
+                    {% for b in near_expiry %}
+                        <li>{{ b.herb.name }}（{{ b.batch_no }}）：{{ b.expire_at|date:"Y-m-d" }} 到期</li>
+                    {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+            {% if not stock_shortage and not near_expiry %}
+                <div class="text-muted">当前无库存或效期预警</div>
+            {% endif %}
+        </div>
+    </div>
 </div>
 {% endblock %}
 

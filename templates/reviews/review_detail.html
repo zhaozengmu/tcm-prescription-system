@@ -5,16 +5,29 @@
 <div class="row g-3">
     <div class="col-md-7">
         <div class="card p-3">
-            <h6>处方信息：{{ prescription.presc_no }}</h6>
+            <h6>处方信息：{{ prescription.presc_no }}
+                <span class="badge bg-secondary">{{ prescription.get_presc_type_display }}</span>
+                <span class="badge {% if prescription.pay_status == 'PAID' %}bg-success{% else %}bg-light text-dark{% endif %}">{{ prescription.get_pay_status_display }}</span>
+            </h6>
             <div class="small text-muted mb-2">
-                患者：{{ prescription.patient.name }} | 医师：{{ prescription.doctor.user.get_full_name }}
+                患者：{{ prescription.patient.name }}（体质：{{ prescription.patient.get_constitution_display }}）
+                | 医师：{{ prescription.doctor.user.get_full_name }}
                 | 诊断：{{ prescription.diagnosis|default:'-' }}
             </div>
+            {% if prescription.patient.allergy_history %}
+                <div class="alert alert-warning py-1 small mb-2">⚠️ 过敏史：{{ prescription.patient.allergy_history }}</div>
+            {% endif %}
+            {% if prescription.presc_type == 'DECOCTION' %}
+                <div class="alert alert-info py-1 small mb-2">代煎：{{ prescription.decoction_note|default:'无备注' }}
+                {% if prescription.pickup_time %}｜取药时间：{{ prescription.pickup_time|date:"Y-m-d H:i" }}{% endif %}
+                {% if prescription.pickup_person %}｜取药人：{{ prescription.pickup_person }}{% endif %}</div>
+            {% endif %}
             <table class="table table-sm">
-                <thead><tr><th>药材</th><th>剂量</th><th>煎服法</th></tr></thead>
+                <thead><tr><th>药材</th><th>剂量</th><th>煎服法</th><th>产地</th></tr></thead>
                 <tbody>
                 {% for item in items %}
-                    <tr><td>{{ item.herb.name }}</td><td>{{ item.dose }}{{ item.unit }}</td><td>{{ item.decoction|default:'-' }}</td></tr>
+                    <tr><td>{{ item.herb.name }}</td><td>{{ item.dose }}{{ item.unit }}</td>
+                    <td>{{ item.decoction|default:'-' }}</td><td>{{ item.herb.origin|default:'-' }}</td></tr>
                 {% endfor %}
                 </tbody>
             </table>
@@ -24,11 +37,11 @@
         <div class="card p-3 mb-3">
             <h6>自动预审结果</h6>
             {% if precheck.blocked %}
-                <div class="alert alert-danger">⚠️ 命中强制拦截规则</div>
+                <div class="alert alert-danger py-2">🔴 命中强制拦截规则（不可直接通过）</div>
             {% elif precheck.hits %}
-                <div class="alert alert-warning">⚠️ 存在预警提示</div>
+                <div class="alert alert-warning py-2">🟠 存在预警提示（药师确认后放行）</div>
             {% else %}
-                <div class="alert alert-success">✓ 预审通过</div>
+                <div class="alert alert-success py-2">✅ 预审通过</div>
             {% endif %}
             <div class="small">{{ precheck.result_text }}</div>
             {% for h in precheck.hits %}
@@ -41,13 +54,26 @@
             {% endfor %}
         </div>
         <div class="card p-3">
-            <h6>复核操作</h6>
+            <h6>审核操作
+                <span class="small text-muted">
+                {% if prescription.status == 'FINAL_REVIEWING' %}（复审中）{% elif prescription.status == 'REVIEWING' %}（初审中）{% endif %}
+                </span>
+            </h6>
             <div class="mb-2">
                 <label class="form-label small">复核意见 / 异常备注</label>
-                <textarea id="opinion" class="form-control" rows="3" placeholder="填写复核意见或退回理由"></textarea>
+                <textarea id="opinion" class="form-control" rows="2" placeholder="填写复核意见或退回理由"></textarea>
             </div>
-            <div class="d-flex gap-2">
-                <button class="btn btn-success" onclick="doApprove()">通过 / 放行</button>
+            <div class="mb-2">
+                <label class="form-label small">不良反应备注（选填）</label>
+                <input id="adverseNote" class="form-control" placeholder="如：既往服用某药出现皮疹">
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                {% if prescription.status != 'FINAL_REVIEWING' %}
+                <button class="btn btn-success" onclick="doApprove()">初审通过</button>
+                {% endif %}
+                {% if can_final_review and prescription.status == 'FINAL_REVIEWING' %}
+                <button class="btn btn-primary" onclick="doApprove()">复审通过</button>
+                {% endif %}
                 <button class="btn btn-danger" onclick="doReject()">退回</button>
                 <button class="btn btn-outline-secondary" onclick="doClaim()">领取任务</button>
             </div>
@@ -57,17 +83,19 @@
         <div class="card p-3">
             <h6>审核轨迹</h6>
             <table class="table table-sm">
-                <thead><tr><th>时间</th><th>药师</th><th>预审结论</th><th>复核意见</th></tr></thead>
+                <thead><tr><th>时间</th><th>级别</th><th>药师</th><th>预审结论</th><th>意见/驳回原因</th><th>不良反应</th></tr></thead>
                 <tbody>
                 {% for r in history %}
                     <tr>
                         <td>{{ r.created_at|date:"Y-m-d H:i" }}</td>
+                        <td><span class="badge {% if r.review_level == 'FINAL' %}bg-primary{% else %}bg-info text-dark{% endif %}">{{ r.get_review_level_display }}</span></td>
                         <td>{{ r.pharmacist.user.get_full_name|default:'-' }}</td>
                         <td>{{ r.precheck_result|default:'-' }}</td>
-                        <td>{{ r.review_opinion|default:'-' }}</td>
+                        <td>{{ r.review_opinion|default:r.reject_reason|default:'-' }}</td>
+                        <td>{{ r.adverse_note|default:'-' }}</td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="4" class="text-muted">暂无审核记录</td></tr>
+                    <tr><td colspan="6" class="text-muted">暂无审核记录</td></tr>
                 {% endfor %}
                 </tbody>
             </table>
@@ -81,6 +109,7 @@
     const prescId = {{ prescription.id }};
     function getCsrf() { return document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''; }
     function getOpinion() { return document.getElementById('opinion').value; }
+    function getAdverse() { return document.getElementById('adverseNote').value; }
 
     async function doClaim() {
         const resp = await fetch(`/api/v1/reviews/${prescId}/claim`, {
@@ -93,7 +122,7 @@
         const opinion = getOpinion();
         const resp = await fetch(`/api/v1/reviews/${prescId}/approve`, {
             method: 'POST', headers: {'Content-Type':'application/json','X-CSRFToken':getCsrf()},
-            body: JSON.stringify({opinion: opinion, alert_note: opinion})
+            body: JSON.stringify({opinion: opinion, alert_note: opinion, adverse_note: getAdverse()})
         });
         const json = await resp.json();
         alert(json.message); if (json.code === 200) location.href = '{% url "reviews:workbench" %}';

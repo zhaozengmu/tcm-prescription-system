@@ -25,6 +25,17 @@ class Patient(models.Model):
         ("PREGNANT", "孕期"),
         ("POSTPARTUM", "产后"),
     ]
+    CONSTITUTION_CHOICES = [
+        ("BALANCED", "平和质"),
+        ("QI_DEFICIENCY", "气虚质"),
+        ("YANG_DEFICIENCY", "阳虚质"),
+        ("YIN_DEFICIENCY", "阴虚质"),
+        ("DAMP_HEAT", "湿热质"),
+        ("BLOOD_STASIS", "血瘀质"),
+        ("QI_STAGNATION", "气郁质"),
+        ("PHLEGM_DAMP", "痰湿质"),
+        ("SPECIAL", "特禀质"),
+    ]
 
     patient_no = models.CharField("患者编号", max_length=32, unique=True)
     name = models.CharField("姓名", max_length=64)
@@ -36,6 +47,8 @@ class Patient(models.Model):
     phone_encrypted = models.TextField("联系电话密文", blank=True)
     phone_hash = models.CharField("联系电话哈希", max_length=64, blank=True, db_index=True)
     allergy_history = models.TextField("过敏史", blank=True)
+    medical_history = models.TextField("既往病史", blank=True)
+    constitution = models.CharField("体质辨识", max_length=32, choices=CONSTITUTION_CHOICES, default="BALANCED")
     pregnancy_status = models.CharField("孕产状态", max_length=16, choices=PREGNANCY_CHOICES, default="NONE")
     visit_summary = models.TextField("既往就诊摘要", blank=True)
     is_deleted = models.BooleanField("逻辑删除", default=False)

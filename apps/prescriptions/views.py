@@ -66,13 +66,19 @@ def api_prescription_create(request):
     patient_id = data.get("patient_id")
     patient = get_object_or_404(Patient, pk=patient_id, is_deleted=False)
 
+    pickup_time_raw = data.get("pickup_time") or ""
+    from django.utils.dateparse import parse_datetime
+    pickup_time = parse_datetime(pickup_time_raw)
     prescription = Prescription.objects.create(
         presc_no=Prescription.generate_presc_no(),
         patient=patient,
         doctor=doctor,
         diagnosis=data.get("diagnosis", ""),
         syndrome=data.get("syndrome", ""),
-        presc_type=data.get("presc_type", "GENERAL"),
+        presc_type=data.get("presc_type", "OUTPATIENT"),
+        decoction_note=data.get("decoction_note", ""),
+        pickup_time=pickup_time,
+        pickup_person=data.get("pickup_person", ""),
         status="DRAFT",
     )
     _log(request, "CREATE", "prescription", str(prescription.id), f"创建处方 {prescription.presc_no}")
@@ -143,6 +149,20 @@ def api_prescription_submit(request, pk):
             state_machine.transition(prescription, "precheck_pass")
 
     _log(request, "SUBMIT", "prescription", str(pk), f"提交处方 {prescription.presc_no}")
+
+    # 提交后通知药师待审
+    from apps.users.models import User, Role
+    from apps.reviews.models import Notification
+    pharmacist_role = Role.objects.filter(code="pharmacist").first()
+    if pharmacist_role:
+        for u in User.objects.filter(userrole__role=pharmacist_role).distinct():
+            Notification.objects.create(
+                recipient=u,
+                title="新处方待审核",
+                content=f"处方 {prescription.presc_no} 已提交，请及时审核",
+                level="WARN" if precheck["blocked"] else "INFO",
+            )
+
     return JsonResponse({
         "code": 200, "message": "已提交预审",
         "data": {"status": prescription.status, "precheck": precheck},

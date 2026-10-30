@@ -16,10 +16,14 @@
                 <td>
                     {% if p.status == 'ALERTED' %}<span class="badge bg-danger">{{ p.get_status_display }}</span>
                     {% elif p.status == 'SUBMITTED' %}<span class="badge bg-secondary">{{ p.get_status_display }}</span>
+                    {% elif p.status == 'FINAL_REVIEWING' %}<span class="badge bg-info text-dark">{{ p.get_status_display }}</span>
                     {% else %}<span class="badge bg-warning">{{ p.get_status_display }}</span>{% endif %}
                 </td>
                 <td>{{ p.created_at|date:"Y-m-d H:i" }}</td>
-                <td><a href="{% url 'reviews:review_detail' p.pk %}" class="btn btn-sm btn-outline-primary">审核</a></td>
+                <td>
+                    {% if p.status == 'FINAL_REVIEWING' %}<span class="small text-muted">待复审</span>
+                    {% else %}<a href="{% url 'reviews:review_detail' p.pk %}" class="btn btn-sm btn-outline-primary">审核</a>{% endif %}
+                </td>
             </tr>
         {% empty %}
             <tr><td colspan="6" class="text-center text-muted">暂无待审处方</td></tr>
