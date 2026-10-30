@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}登录 - 中医处方管理系统{% endblock %}
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-4">
+        <div class="card p-4">
+            <h4 class="text-center mb-4">🌿 中医处方开具与审核管理系统</h4>
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label">用户名</label>
+                    <input type="text" name="username" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">密码</label>
+                    <input type="password" name="password" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">验证码</label>
+                    <input type="text" name="captcha" class="form-control" placeholder="输入验证码" required>
+                    <div class="text-muted small mt-1">演示验证码：<span class="masked">demo</span></div>
+                </div>
+                <button type="submit" class="btn btn-success w-100">登录</button>
+            </form>
+            <hr>
+            <div class="small text-muted">
+                <div>演示账号：</div>
+                <div>管理员：admin / Admin@123</div>
+                <div>医师：doctor1 / Doctor@123</div>
+                <div>药师：pharmacist1 / Pharm@123</div>
+                <div>患者：patient1 / Patient@123</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

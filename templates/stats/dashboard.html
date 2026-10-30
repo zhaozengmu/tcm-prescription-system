@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}管理驾驶舱{% endblock %}
+{% block content %}
+<h4 class="mb-3">📊 管理驾驶舱</h4>
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card p-3 stat-card">
+            <div class="text-muted">今日处方数</div>
+            <div class="value text-success">{{ today_presc }}</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card p-3 stat-card">
+            <div class="text-muted">待审核处方</div>
+            <div class="value text-warning">{{ pending_review }}</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card p-3 stat-card">
+            <div class="text-muted">审核退回数</div>
+            <div class="value text-danger">{{ rejected }}</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card p-3 stat-card">
+            <div class="text-muted">累计处方数</div>
+            <div class="value text-primary">{{ total_presc }}</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-6">
+        <div class="card p-3">
+            <h6>近 7 日处方量趋势</h6>
+            <div id="trendChart" style="height:260px;"></div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card p-3">
+            <h6>医师工作量排名 Top 10</h6>
+            <table class="table table-sm table-striped">
+                <thead><tr><th>医师</th><th>处方数</th></tr></thead>
+                <tbody>
+                {% for d in doctor_rank %}
+                    <tr><td>{{ d.doctor__user__first_name|default:d.doctor__user__username }}</td><td>{{ d.cnt }}</td></tr>
+                {% empty %}
+                    <tr><td colspan="2" class="text-muted">暂无数据</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="col-md-12">
+        <div class="card p-3">
+            <h6>药材消耗 Top 10（按总剂量）</h6>
+            <table class="table table-sm table-striped">
+                <thead><tr><th>药材</th><th>总剂量(g)</th></tr></thead>
+                <tbody>
+                {% for h in herb_top %}
+                    <tr><td>{{ h.herb__name }}</td><td>{{ h.total }}</td></tr>
+                {% empty %}
+                    <tr><td colspan="2" class="text-muted">暂无数据</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    var chartDom = document.getElementById('trendChart');
+    var myChart = echarts.init(chartDom);
+    var dates = [{% for t in trend %}'{{ t.date }}',{% endfor %}];
+    var counts = [{% for t in trend %}{{ t.count }},{% endfor %}];
+    var option = {
+        xAxis: { type: 'category', data: dates },
+        yAxis: { type: 'value' },
+        series: [{ data: counts, type: 'line', smooth: true, areaStyle: {}, color: '#1a7f37' }],
+        grid: { left: 40, right: 20, top: 20, bottom: 30 }
+    };
+    myChart.setOption(option);
+</script>
+{% endblock %}

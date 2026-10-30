@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}处方审核{% endblock %}
+{% block content %}
+<h4 class="mb-3">🔍 处方审核详情</h4>
+<div class="row g-3">
+    <div class="col-md-7">
+        <div class="card p-3">
+            <h6>处方信息：{{ prescription.presc_no }}</h6>
+            <div class="small text-muted mb-2">
+                患者：{{ prescription.patient.name }} | 医师：{{ prescription.doctor.user.get_full_name }}
+                | 诊断：{{ prescription.diagnosis|default:'-' }}
+            </div>
+            <table class="table table-sm">
+                <thead><tr><th>药材</th><th>剂量</th><th>煎服法</th></tr></thead>
+                <tbody>
+                {% for item in items %}
+                    <tr><td>{{ item.herb.name }}</td><td>{{ item.dose }}{{ item.unit }}</td><td>{{ item.decoction|default:'-' }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="col-md-5">
+        <div class="card p-3 mb-3">
+            <h6>自动预审结果</h6>
+            {% if precheck.blocked %}
+                <div class="alert alert-danger">⚠️ 命中强制拦截规则</div>
+            {% elif precheck.hits %}
+                <div class="alert alert-warning">⚠️ 存在预警提示</div>
+            {% else %}
+                <div class="alert alert-success">✓ 预审通过</div>
+            {% endif %}
+            <div class="small">{{ precheck.result_text }}</div>
+            {% for h in precheck.hits %}
+                <div class="border rounded p-2 mt-2 {% if h.level == 'block' %}border-danger bg-danger-subtle{% else %}border-warning bg-warning-subtle{% endif %}">
+                    <strong>{{ h.rule_no }}</strong> {{ h.message }}
+                    <span class="badge {% if h.level == 'block' %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+                        {{ h.level|yesno:'强制拦截,预警提示' }}
+                    </span>
+                </div>
+            {% endfor %}
+        </div>
+        <div class="card p-3">
+            <h6>复核操作</h6>
+            <div class="mb-2">
+                <label class="form-label small">复核意见 / 异常备注</label>
+                <textarea id="opinion" class="form-control" rows="3" placeholder="填写复核意见或退回理由"></textarea>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-success" onclick="doApprove()">通过 / 放行</button>
+                <button class="btn btn-danger" onclick="doReject()">退回</button>
+                <button class="btn btn-outline-secondary" onclick="doClaim()">领取任务</button>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-12">
+        <div class="card p-3">
+            <h6>审核轨迹</h6>
+            <table class="table table-sm">
+                <thead><tr><th>时间</th><th>药师</th><th>预审结论</th><th>复核意见</th></tr></thead>
+                <tbody>
+                {% for r in history %}
+                    <tr>
+                        <td>{{ r.created_at|date:"Y-m-d H:i" }}</td>
+                        <td>{{ r.pharmacist.user.get_full_name|default:'-' }}</td>
+                        <td>{{ r.precheck_result|default:'-' }}</td>
+                        <td>{{ r.review_opinion|default:'-' }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="4" class="text-muted">暂无审核记录</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const prescId = {{ prescription.id }};
+    function getCsrf() { return document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''; }
+    function getOpinion() { return document.getElementById('opinion').value; }
+
+    async function doClaim() {
+        const resp = await fetch(`/api/v1/reviews/${prescId}/claim`, {
+            method: 'POST', headers: {'Content-Type':'application/json','X-CSRFToken':getCsrf()}, body: '{}'
+        });
+        const json = await resp.json();
+        alert(json.message); if (json.code === 200) location.reload();
+    }
+    async function doApprove() {
+        const opinion = getOpinion();
+        const resp = await fetch(`/api/v1/reviews/${prescId}/approve`, {
+            method: 'POST', headers: {'Content-Type':'application/json','X-CSRFToken':getCsrf()},
+            body: JSON.stringify({opinion: opinion, alert_note: opinion})
+        });
+        const json = await resp.json();
+        alert(json.message); if (json.code === 200) location.href = '{% url "reviews:workbench" %}';
+    }
+    async function doReject() {
+        const opinion = getOpinion();
+        if (!opinion) { alert('退回必须填写理由'); return; }
+        const resp = await fetch(`/api/v1/reviews/${prescId}/reject`, {
+            method: 'POST', headers: {'Content-Type':'application/json','X-CSRFToken':getCsrf()},
+            body: JSON.stringify({opinion: opinion})
+        });
+        const json = await resp.json();
+        alert(json.message); if (json.code === 200) location.href = '{% url "reviews:workbench" %}';
+    }
+</script>
+{% endblock %}

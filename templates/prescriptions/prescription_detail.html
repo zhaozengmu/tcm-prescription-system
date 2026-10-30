@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}处方详情{% endblock %}
+{% block content %}
+<h4 class="mb-3">📄 处方详情</h4>
+<div class="card p-4">
+    <table class="table">
+        <tr><th style="width:150px;">处方号</th><td>{{ prescription.presc_no }}</td></tr>
+        <tr><th>患者</th><td>{{ prescription.patient.name }}</td></tr>
+        <tr><th>医师</th><td>{{ prescription.doctor.user.get_full_name }}</td></tr>
+        <tr><th>诊断</th><td>{{ prescription.diagnosis|default:'-' }}</td></tr>
+        <tr><th>辨证结论</th><td>{{ prescription.syndrome|default:'-' }}</td></tr>
+        <tr><th>状态</th><td>{{ prescription.get_status_display }}</td></tr>
+        <tr><th>版本号</th><td>v{{ prescription.version }}</td></tr>
+    </table>
+    <h6>药味明细</h6>
+    <table class="table table-sm table-striped">
+        <thead><tr><th>药材</th><th>剂量</th><th>煎服法</th><th>用法用量</th></tr></thead>
+        <tbody>
+        {% for item in items %}
+            <tr><td>{{ item.herb.name }}</td><td>{{ item.dose }}{{ item.unit }}</td><td>{{ item.decoction|default:'-' }}</td><td>{{ item.usage|default:'-' }}</td></tr>
+        {% empty %}
+            <tr><td colspan="4" class="text-muted">暂无药味</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    <a href="{% url 'prescriptions:prescription_list' %}" class="btn btn-outline-secondary">返回</a>
+</div>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}历史检索{% endblock %}
+{% block content %}
+<h4 class="mb-3">🔎 历史处方检索</h4>
+<div class="card p-3">
+    <form class="row g-2 mb-3" onsubmit="doSearch(event)">
+        <div class="col-md-2">
+            <select name="status" class="form-select">
+                <option value="">全部状态</option>
+                <option value="DRAFT">草稿</option>
+                <option value="SUBMITTED">待预审</option>
+                <option value="PRECHECKED">已预审</option>
+                <option value="ALERTED">预警拦截</option>
+                <option value="REVIEWING">复核中</option>
+                <option value="APPROVED">已通过</option>
+                <option value="REJECTED">已驳回</option>
+                <option value="DISPENSED">已发药完结</option>
+            </select>
+        </div>
+        <div class="col-md-2"><input type="text" name="doctor" class="form-control" placeholder="医师"></div>
+        <div class="col-md-2"><input type="text" name="patient" class="form-control" placeholder="患者"></div>
+        <div class="col-md-2"><input type="date" name="start" class="form-control"></div>
+        <div class="col-md-2"><input type="date" name="end" class="form-control"></div>
+        <div class="col-md-2"><button type="submit" class="btn btn-primary w-100">检索</button></div>
+    </form>
+    <table class="table table-sm table-striped">
+        <thead><tr><th>处方号</th><th>患者</th><th>医师</th><th>状态</th><th>创建时间</th></tr></thead>
+        <tbody id="resultBody">
+            <tr><td colspan="5" class="text-muted">输入条件后点击检索</td></tr>
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function doSearch(e) {
+        e.preventDefault();
+        const form = e.target;
+        const params = new URLSearchParams(new FormData(form));
+        const resp = await fetch('/api/v1/search/prescriptions?' + params.toString());
+        const json = await resp.json();
+        const body = document.getElementById('resultBody');
+        if (json.code !== 200) { body.innerHTML = '<tr><td colspan="5">' + json.message + '</td></tr>'; return; }
+        if (json.data.items.length === 0) {
+            body.innerHTML = '<tr><td colspan="5" class="text-muted">无结果</td></tr>';
+            return;
+        }
+        body.innerHTML = json.data.items.map(it => `
+            <tr><td>${it.presc_no}</td><td>${it.patient_name}</td><td>${it.doctor_name}</td><td>${it.status}</td><td>${it.created_at}</td></tr>
+        `).join('');
+    }
+</script>
+{% endblock %}

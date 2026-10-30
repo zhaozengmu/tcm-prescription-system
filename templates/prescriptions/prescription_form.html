@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}新建处方{% endblock %}
+{% block content %}
+<h4 class="mb-3">📝 新建处方</h4>
+<div class="card p-4">
+    <form id="prescForm" class="row g-3">
+        {% csrf_token %}
+        <div class="col-md-4">
+            <label class="form-label">选择患者</label>
+            <select name="patient_id" class="form-select" required>
+                <option value="">请选择患者</option>
+                {% for p in patients %}
+                    <option value="{{ p.id }}">{{ p.name }}（{{ p.patient_no }}）</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">诊断</label>
+            <input type="text" name="diagnosis" class="form-control" placeholder="如：风寒感冒">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">辨证结论</label>
+            <input type="text" name="syndrome" class="form-control" placeholder="如：风寒束表证">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">处方类型</label>
+            <select name="presc_type" class="form-select">
+                <option value="GENERAL">普通处方</option>
+                <option value="DECOCTION">汤剂处方</option>
+                <option value="GRANULE">颗粒剂处方</option>
+            </select>
+        </div>
+        <div class="col-md-8">
+            <label class="form-label">方剂模板（一键引用）</label>
+            <select id="formulaSelect" class="form-select">
+                <option value="">选择方剂模板</option>
+                {% for f in templates %}
+                    <option value="{{ f.id }}">{{ f.name }}（{{ f.indication }}）</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-12">
+            <label class="form-label">药味明细</label>
+            <table class="table table-sm" id="itemTable">
+                <thead><tr><th>药材</th><th>剂量(g)</th><th>煎服法</th><th>用法用量</th><th></th></tr></thead>
+                <tbody id="itemBody">
+                    <tr>
+                        <td>
+                            <select class="form-select herb-select">
+                                <option value="">选择药材</option>
+                                {% for h in herbs %}<option value="{{ h.id }}">{{ h.name }}{% if h.is_toxic %}⚠️{% endif %}</option>{% endfor %}
+                            </select>
+                        </td>
+                        <td><input type="number" step="0.01" class="form-control dose-input" placeholder="剂量"></td>
+                        <td><input type="text" class="form-control decoction-input" placeholder="如：先煎/后下/包煎"></td>
+                        <td><input type="text" class="form-control usage-input" placeholder="如：水煎服，日一剂"></td>
+                        <td><button type="button" class="btn btn-sm btn-danger remove-row">×</button></td>
+                    </tr>
+                </tbody>
+            </table>
+            <button type="button" class="btn btn-sm btn-outline-primary" id="addRow">+ 添加药味</button>
+        </div>
+        <div class="col-12 d-flex gap-2">
+            <button type="button" class="btn btn-secondary" id="saveDraftBtn">保存草稿</button>
+            <button type="button" class="btn btn-success" id="submitBtn">提交预审</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentPrescId = null;
+
+    function collectItems() {
+        const items = [];
+        document.querySelectorAll('#itemBody tr').forEach(row => {
+            const herbId = row.querySelector('.herb-select').value;
+            const dose = row.querySelector('.dose-input').value;
+            if (herbId && dose) {
+                items.push({
+                    herb_id: parseInt(herbId),
+                    dose: parseFloat(dose),
+                    decoction: row.querySelector('.decoction-input').value,
+                    usage: row.querySelector('.usage-input').value
+                });
+            }
+        });
+        return items;
+    }
+
+    function getFormData() {
+        const form = document.getElementById('prescForm');
+        return {
+            patient_id: parseInt(form.patient_id.value),
+            diagnosis: form.diagnosis.value,
+            syndrome: form.syndrome.value,
+            presc_type: form.presc_type.value
+        };
+    }
+
+    function getCsrf() {
+        return document.querySelector('[name=csrfmiddlewaretoken]').value;
+    }
+
+    document.getElementById('addRow').addEventListener('click', () => {
+        const tbody = document.getElementById('itemBody');
+        const tr = tbody.querySelector('tr').cloneNode(true);
+        tr.querySelectorAll('input').forEach(i => i.value = '');
+        tr.querySelector('.herb-select').value = '';
+        tbody.appendChild(tr);
+    });
+
+    document.getElementById('itemBody').addEventListener('click', (e) => {
+        if (e.target.classList.contains('remove-row')) {
+            if (document.querySelectorAll('#itemBody tr').length > 1) {
+                e.target.closest('tr').remove();
+            }
+        }
+    });
+
+    document.getElementById('formulaSelect').addEventListener('change', async (e) => {
+        const id = e.target.value;
+        if (!id) return;
+        const resp = await fetch(`/api/v1/formulas/${id}`);
+        const json = await resp.json();
+        if (json.code === 200) {
+            const tbody = document.getElementById('itemBody');
+            tbody.innerHTML = '';
+            json.data.items.forEach(it => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><select class="form-select herb-select"><option value="${it.herb_id}" selected>${it.herb__name}</option></select></td>
+                    <td><input type="number" step="0.01" class="form-control dose-input" value="${it.dose}"></td>
+                    <td><input type="text" class="form-control decoction-input" placeholder="如：先煎/后下/包煎"></td>
+                    <td><input type="text" class="form-control usage-input" placeholder="如：水煎服，日一剂"></td>
+                    <td><button type="button" class="btn btn-sm btn-danger remove-row">×</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+    });
+
+    async function createPrescription() {
+        const resp = await fetch('/api/v1/prescriptions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+            body: JSON.stringify(getFormData())
+        });
+        return await resp.json();
+    }
+
+    async function saveItems() {
+        if (!currentPrescId) return;
+        const resp = await fetch(`/api/v1/prescriptions/${currentPrescId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+            body: JSON.stringify({ items: collectItems() })
+        });
+        return await resp.json();
+    }
+
+    document.getElementById('saveDraftBtn').addEventListener('click', async () => {
+        if (!currentPrescId) {
+            const created = await createPrescription();
+            if (created.code !== 200) { alert(created.message); return; }
+            currentPrescId = created.data.id;
+        }
+        const saved = await saveItems();
+        if (saved.code === 200) {
+            alert('草稿已保存，处方号：' + (currentPrescId ? '已创建' : ''));
+            location.href = '{% url "prescriptions:prescription_list" %}';
+        } else {
+            alert(saved.message);
+        }
+    });
+
+    document.getElementById('submitBtn').addEventListener('click', async () => {
+        if (!currentPrescId) {
+            const created = await createPrescription();
+            if (created.code !== 200) { alert(created.message); return; }
+            currentPrescId = created.data.id;
+        }
+        await saveItems();
+        const resp = await fetch(`/api/v1/prescriptions/${currentPrescId}/submit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+            body: JSON.stringify({})
+        });
+        const json = await resp.json();
+        if (json.code === 200) {
+            let msg = '提交成功，当前状态：' + json.data.status;
+            if (json.data.precheck && json.data.precheck.blocked) {
+                msg += '\n⚠️ 命中强制拦截规则：' + json.data.precheck.result_text;
+            }
+            alert(msg);
+            location.href = '{% url "prescriptions:prescription_list" %}';
+        } else {
+            alert(json.message);
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}患者管理{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4>👥 患者信息管理</h4>
+    <button class="btn btn-success" onclick="location.href='{% url 'prescriptions:prescription_create' %}'">新建处方</button>
+</div>
+
+<form class="row g-2 mb-3">
+    <div class="col-md-3"><input type="text" name="name" class="form-control" placeholder="姓名" value="{{ request.GET.name }}"></div>
+    <div class="col-md-3"><input type="text" name="patient_no" class="form-control" placeholder="患者编号" value="{{ request.GET.patient_no }}"></div>
+    <div class="col-md-2">
+        <select name="gender" class="form-select">
+            <option value="">全部性别</option>
+            <option value="M" {% if request.GET.gender == 'M' %}selected{% endif %}>男</option>
+            <option value="F" {% if request.GET.gender == 'F' %}selected{% endif %}>女</option>
+        </select>
+    </div>
+    <div class="col-md-2"><button type="submit" class="btn btn-primary w-100">筛选</button></div>
+</form>
+
+<div class="card p-3">
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr><th>患者编号</th><th>姓名</th><th>性别</th><th>年龄</th><th>身份证号</th><th>联系电话</th><th>孕产状态</th><th>操作</th></tr>
+        </thead>
+        <tbody>
+        {% for p in page %}
+            <tr>
+                <td>{{ p.patient_no }}</td>
+                <td>{{ p.name }}</td>
+                <td>{{ p.get_gender_display }}</td>
+                <td>{{ p.age|default:'-' }}</td>
+                <td class="masked">{{ p.masked_id_card|default:'-' }}</td>
+                <td class="masked">{{ p.masked_phone|default:'-' }}</td>
+                <td>{{ p.get_pregnancy_status_display }}</td>
+                <td><a href="{% url 'patients:patient_detail' p.pk %}" class="btn btn-sm btn-outline-primary">详情</a></td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="8" class="text-center text-muted">暂无患者数据</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% if page.has_other_pages %}
+    <nav>
+        <ul class="pagination pagination-sm">
+            {% if page.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ page.previous_page_number }}">上一页</a></li>{% endif %}
+            <li class="page-item disabled"><span class="page-link">第 {{ page.number }} / {{ page.paginator.num_pages }} 页</span></li>
+            {% if page.has_next %}<li class="page-item"><a class="page-link" href="?page={{ page.next_page_number }}">下一页</a></li>{% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

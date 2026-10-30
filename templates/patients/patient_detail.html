@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}患者详情{% endblock %}
+{% block content %}
+<h4 class="mb-3">患者详情</h4>
+<div class="card p-4 col-md-8">
+    <table class="table">
+        <tr><th style="width:150px;">患者编号</th><td>{{ patient.patient_no }}</td></tr>
+        <tr><th>姓名</th><td>{{ patient.name }}</td></tr>
+        <tr><th>性别</th><td>{{ patient.get_gender_display }}</td></tr>
+        <tr><th>年龄</th><td>{{ patient.age|default:'-' }}</td></tr>
+        <tr><th>身份证号</th><td class="masked">{{ patient.id_card|default:'-' }}</td></tr>
+        <tr><th>联系电话</th><td class="masked">{{ patient.phone|default:'-' }}</td></tr>
+        <tr><th>过敏史</th><td>{{ patient.allergy_history|default:'无' }}</td></tr>
+        <tr><th>孕产状态</th><td>{{ patient.get_pregnancy_status_display }}</td></tr>
+        <tr><th>既往就诊摘要</th><td>{{ patient.visit_summary|default:'无' }}</td></tr>
+    </table>
+    <a href="{% url 'patients:patient_list' %}" class="btn btn-outline-secondary">返回列表</a>
+</div>
+{% endblock %}
