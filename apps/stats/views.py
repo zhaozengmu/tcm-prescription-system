@@ -270,3 +270,110 @@ def api_export(request):
     response = HttpResponse(buf.read(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     response["Content-Disposition"] = 'attachment; filename="prescriptions.xlsx"'
     return response
+
+
+def api_export_herbs(request):
+    """GET /api/v1/export/herbs 药材台账导出（Excel）。"""
+    if not request.user.is_authenticated:
+        return JsonResponse({"code": 401, "message": "未登录"}, status=401)
+    if not has_permission(request.user, "导出:执行"):
+        return JsonResponse({"code": 403, "message": "无权限"}, status=403)
+
+    import io
+    import openpyxl
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "药材台账"
+    ws.append(["药材名称", "拼音首字母", "类别", "性味归经", "功效主治", "道地产地", "炮制规格",
+               "剂量上限(g)", "常用剂量(g)", "毒性", "库存(kg)", "预警线(kg)"])
+
+    for h in Herb.objects.all().order_by("pinyin_initial", "name"):
+        ws.append([
+            h.name, h.pinyin_initial, h.category, h.property, h.efficacy, h.origin, h.processing,
+            float(h.max_dose) if h.max_dose else "", float(h.default_dose) if h.default_dose else "",
+            "是" if h.is_toxic else "否", float(h.stock), float(h.stock_warning),
+        ])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    from apps.stats.models import OperationLog
+    from apps.users.permissions import get_client_ip
+    OperationLog.objects.create(
+        operator=request.user, action_type="EXPORT", object_type="herb",
+        object_id="all", detail="导出药材台账", ip=get_client_ip(request), result="success",
+    )
+
+    response = HttpResponse(buf.read(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response["Content-Disposition"] = 'attachment; filename="herbs.xlsx"'
+    return response
+
+
+def api_export_logs(request):
+    """GET /api/v1/export/logs 操作日志导出（Excel）。"""
+    if not request.user.is_authenticated:
+        return JsonResponse({"code": 401, "message": "未登录"}, status=401)
+    if not has_permission(request.user, "导出:执行"):
+        return JsonResponse({"code": 403, "message": "无权限"}, status=403)
+
+    import io
+    import openpyxl
+    from openpyxl import Workbook
+    from .models import OperationLog
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "操作日志"
+    ws.append(["操作人", "动作", "对象类型", "对象ID", "详情", "IP", "结果", "时间"])
+
+    for log in OperationLog.objects.select_related("operator").order_by("-created_at")[:5000]:
+        ws.append([
+            log.operator.username if log.operator else "-", log.action_type, log.object_type,
+            log.object_id, log.detail, log.ip, log.result,
+            log.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+        ])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    response = HttpResponse(buf.read(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response["Content-Disposition"] = 'attachment; filename="operation_logs.xlsx"'
+    return response
+
+
+def api_export_reviews(request):
+    """GET /api/v1/export/reviews 审核记录导出（Excel）。"""
+    if not request.user.is_authenticated:
+        return JsonResponse({"code": 401, "message": "未登录"}, status=401)
+    if not has_permission(request.user, "导出:执行"):
+        return JsonResponse({"code": 403, "message": "无权限"}, status=403)
+
+    import io
+    import openpyxl
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "审核记录"
+    ws.append(["处方号", "审核级别", "审核人", "审核意见", "驳回原因", "不良反应备注", "审核时间"])
+
+    for rv in ReviewRecord.objects.select_related("prescription", "pharmacist__user").order_by("-created_at")[:5000]:
+        ws.append([
+            rv.prescription.presc_no,
+            rv.get_review_level_display(),
+            (rv.pharmacist.user.get_full_name() or rv.pharmacist.user.username) if rv.pharmacist else "-",
+            rv.review_opinion, rv.reject_reason or "", rv.adverse_note or "",
+            rv.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+        ])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    response = HttpResponse(buf.read(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response["Content-Disposition"] = 'attachment; filename="review_records.xlsx"'
+    return response

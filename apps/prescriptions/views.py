@@ -4,12 +4,14 @@
 """
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404, redirect
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
+from django.contrib import messages
 import json
 
-from .models import Prescription, PrescriptionItem, Herb, FormulaTemplate
+from .models import Prescription, PrescriptionItem, Herb, FormulaTemplate, HerbBatch, Supplier
 from apps.patients.models import Patient
 from apps.reviews import engine, state_machine
 from apps.users.permissions import has_permission, get_client_ip
@@ -47,6 +49,57 @@ def prescription_detail(request, pk):
     return render(request, "prescriptions/prescription_detail.html", {
         "prescription": prescription, "items": items,
     })
+
+
+@login_required
+def herb_list(request):
+    """药材字典管理页（拼音首字母检索、产地/炮制/库存展示）。"""
+    if not has_permission(request.user, "字典:维护"):
+        return render(request, "prescriptions/no_permission.html")
+    q = request.GET.get("q", "").strip()
+    herbs = Herb.objects.all().order_by("pinyin_initial", "name")
+    if q:
+        herbs = herbs.filter(
+            Q(name__icontains=q)
+            | Q(pinyin_initial__icontains=q.upper())
+            | Q(origin__icontains=q)
+            | Q(processing__icontains=q)
+            | Q(efficacy__icontains=q)
+        )
+    return render(request, "prescriptions/herb_list.html", {"herbs": herbs, "q": q})
+
+
+@login_required
+def herb_card(request, pk):
+    """药材信息卡片（打印/PDF 导出）。"""
+    herb = get_object_or_404(Herb, pk=pk)
+    batches = herb.batches.select_related("supplier").order_by("-inbound_at")
+    return render(request, "prescriptions/herb_card.html", {"herb": herb, "batches": batches})
+
+
+@login_required
+def herb_card_pdf(request, pk):
+    """药材信息卡片 PDF 导出。"""
+    herb = get_object_or_404(Herb, pk=pk)
+    batches = herb.batches.select_related("supplier").order_by("-inbound_at")
+    html = render(request, "prescriptions/herb_card.html", {"herb": herb, "batches": batches}).content.decode("utf-8")
+    return _html_to_pdf_response(html, f"药材卡片_{herb.name}.pdf")
+
+
+@login_required
+def herb_import(request):
+    """药材字典 Excel 批量导入页面。"""
+    if not has_permission(request.user, "字典:维护"):
+        return render(request, "prescriptions/no_permission.html")
+    if request.method == "POST":
+        f = request.FILES.get("file")
+        if not f:
+            messages.error(request, "请选择要上传的 Excel 文件")
+            return redirect("prescriptions:herb_list")
+        result = _import_herbs_excel(f)
+        messages.success(request, f"导入完成：成功 {result['success']} 条，跳过 {result['skip']} 条")
+        return redirect("prescriptions:herb_list")
+    return render(request, "prescriptions/herb_import.html")
 
 
 # ============ API 接口 ============
@@ -169,6 +222,29 @@ def api_prescription_submit(request, pk):
     })
 
 
+@login_required
+def prescription_print(request, pk):
+    """处方单 A4 打印视图（含处方编号、医师/药师签章位置）。"""
+    prescription = get_object_or_404(Prescription, pk=pk)
+    items = prescription.items.select_related("herb").all()
+    reviews = prescription.review_records.select_related("pharmacist__user").order_by("created_at")
+    return render(request, "prescriptions/prescription_print.html", {
+        "prescription": prescription, "items": items, "reviews": reviews,
+    })
+
+
+@login_required
+def prescription_pdf(request, pk):
+    """处方单 PDF 导出（复用打印样式，生成 PDF 供下载）。"""
+    prescription = get_object_or_404(Prescription, pk=pk)
+    items = prescription.items.select_related("herb").all()
+    reviews = prescription.review_records.select_related("pharmacist__user").order_by("created_at")
+    html = render(request, "prescriptions/prescription_print.html", {
+        "prescription": prescription, "items": items, "reviews": reviews,
+    }).content.decode("utf-8")
+    return _html_to_pdf_response(html, f"处方单_{prescription.presc_no}.pdf")
+
+
 def api_formula_detail(request, formula_id):
     """GET /api/v1/formulas/{id} 方剂模板详情（一键引用）。"""
     if not request.user.is_authenticated:
@@ -188,3 +264,108 @@ def _log(request, action_type, object_type, object_id, detail):
         operator=request.user, action_type=action_type, object_type=object_type,
         object_id=object_id, detail=detail, ip=get_client_ip(request), result="success",
     )
+
+
+def _html_to_pdf_response(html, filename):
+    """将 HTML 转成 PDF 响应（优先 WeasyPrint，回退返回可打印的 HTML）。"""
+    try:
+        from weasyprint import HTML
+        pdf = HTML(string=html).write_pdf()
+        response = HttpResponse(pdf, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
+    except Exception:
+        # 无 WeasyPrint 时，返回带打印按钮的 HTML，浏览器 Ctrl+P 即可打印/存 PDF
+        response = HttpResponse(html, content_type="text/html; charset=utf-8")
+        return response
+
+
+def _import_herbs_excel(fileobj):
+    """解析 Excel 批量导入药材。返回 {"success": n, "skip": n}。"""
+    import io
+    import openpyxl
+
+    success = 0
+    skip = 0
+    try:
+        wb = openpyxl.load_workbook(io.BytesIO(fileobj.read()), data_only=True)
+        ws = wb.active
+        rows = list(ws.iter_rows(values_only=True))
+        if not rows:
+            return {"success": 0, "skip": 0}
+        # 表头：药材名称, 拼音首字母, 类别, 性味归经, 功效主治, 道地产地, 炮制规格, 剂量上限, 毒性, 常用剂量, 单位, 库存, 预警线
+        header = [str(c).strip() if c else "" for c in rows[0]]
+        for row in rows[1:]:
+            if not row or not row[0]:
+                continue
+            name = str(row[0]).strip()
+            if not name:
+                skip += 1
+                continue
+            defaults = {}
+            field_map = {
+                "拼音首字母": "pinyin_initial",
+                "类别": "category",
+                "性味归经": "property",
+                "功效主治": "efficacy",
+                "道地产地": "origin",
+                "炮制规格": "processing",
+                "单位": "unit",
+            }
+            for idx, col in enumerate(header):
+                if col in field_map and idx < len(row) and row[idx] is not None:
+                    defaults[field_map[col]] = str(row[idx]).strip()
+            # 拼音
+            if "拼音" in header:
+                idx = header.index("拼音")
+                if idx < len(row) and row[idx]:
+                    defaults["pinyin"] = str(row[idx]).strip()
+            # 剂量上限
+            if "剂量上限" in header:
+                idx = header.index("剂量上限")
+                if idx < len(row) and row[idx] not in (None, ""):
+                    try:
+                        defaults["max_dose"] = float(row[idx])
+                    except (ValueError, TypeError):
+                        pass
+            # 常用剂量
+            if "常用剂量" in header:
+                idx = header.index("常用剂量")
+                if idx < len(row) and row[idx] not in (None, ""):
+                    try:
+                        defaults["default_dose"] = float(row[idx])
+                    except (ValueError, TypeError):
+                        pass
+            # 毒性
+            if "毒性" in header:
+                idx = header.index("毒性")
+                if idx < len(row) and row[idx] not in (None, ""):
+                    defaults["is_toxic"] = str(row[idx]).strip() in ("是", "1", "true", "True", "毒")
+            # 库存 / 预警线
+            if "库存" in header:
+                idx = header.index("库存")
+                if idx < len(row) and row[idx] not in (None, ""):
+                    try:
+                        defaults["stock"] = float(row[idx])
+                    except (ValueError, TypeError):
+                        pass
+            if "预警线" in header:
+                idx = header.index("预警线")
+                if idx < len(row) and row[idx] not in (None, ""):
+                    try:
+                        defaults["stock_warning"] = float(row[idx])
+                    except (ValueError, TypeError):
+                        pass
+
+            # 自动补全拼音首字母
+            if not defaults.get("pinyin_initial") and defaults.get("pinyin"):
+                defaults["pinyin_initial"] = "".join(w[0] for w in defaults["pinyin"].split()).upper()
+
+            _, created = Herb.objects.get_or_create(name=name, defaults=defaults)
+            if created:
+                success += 1
+            else:
+                skip += 1
+        return {"success": success, "skip": skip}
+    except Exception:
+        return {"success": 0, "skip": 0}

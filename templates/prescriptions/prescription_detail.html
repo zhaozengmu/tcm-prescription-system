@@ -1,23 +1,47 @@
 {% extends "base.html" %}
-{% block title %}处方详情{% endblock %}
+{% block title %}处方详情 - TCM-RMS{% endblock %}
 {% block content %}
-<h4 class="mb-3">📄 处方详情</h4>
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h4 class="mb-0 section-title">处方详情</h4>
+    <div class="d-flex gap-2">
+        <a href="{% url 'prescriptions:prescription_print' prescription.pk %}" target="_blank" class="btn btn-sm btn-brand">🖨 打印处方单</a>
+        <a href="{% url 'prescriptions:prescription_pdf' prescription.pk %}" class="btn btn-sm btn-outline-brand">⬇ 导出 PDF</a>
+    </div>
+</div>
 <div class="card p-4">
     <table class="table">
-        <tr><th style="width:150px;">处方号</th><td>{{ prescription.presc_no }}</td></tr>
+        <tr><th style="width:150px;">处方号</th><td><strong>{{ prescription.presc_no }}</strong></td></tr>
         <tr><th>患者</th><td>{{ prescription.patient.name }}</td></tr>
         <tr><th>医师</th><td>{{ prescription.doctor.user.get_full_name }}</td></tr>
+        <tr><th>处方类型</th><td>{{ prescription.get_presc_type_display }}</td></tr>
         <tr><th>诊断</th><td>{{ prescription.diagnosis|default:'-' }}</td></tr>
         <tr><th>辨证结论</th><td>{{ prescription.syndrome|default:'-' }}</td></tr>
-        <tr><th>状态</th><td>{{ prescription.get_status_display }}</td></tr>
+        <tr><th>状态</th><td>
+            {% if prescription.status == 'APPROVED' or prescription.status == 'DISPENSED' %}
+                <span class="badge badge-status bg-success">{{ prescription.get_status_display }}</span>
+            {% elif prescription.status == 'REJECTED' or prescription.status == 'ALERTED' %}
+                <span class="badge badge-status bg-danger">{{ prescription.get_status_display }}</span>
+            {% elif prescription.status == 'DRAFT' %}
+                <span class="badge badge-status bg-secondary">{{ prescription.get_status_display }}</span>
+            {% else %}
+                <span class="badge badge-status bg-warning text-dark">{{ prescription.get_status_display }}</span>
+            {% endif %}
+        </td></tr>
+        <tr><th>缴费状态</th><td>{{ prescription.get_pay_status_display }}</td></tr>
         <tr><th>版本号</th><td>v{{ prescription.version }}</td></tr>
+        {% if prescription.decoction_note %}
+        <tr><th>代煎备注</th><td>{{ prescription.decoction_note }}</td></tr>
+        {% endif %}
+        {% if prescription.pickup_time %}
+        <tr><th>取药时间</th><td>{{ prescription.pickup_time|date:"Y-m-d H:i" }}（取药人：{{ prescription.pickup_person|default:"-" }}）</td></tr>
+        {% endif %}
     </table>
-    <h6>药味明细</h6>
-    <table class="table table-sm table-striped">
+    <h6 class="section-title">药味明细</h6>
+    <table class="table table-sm table-hover">
         <thead><tr><th>药材</th><th>剂量</th><th>煎服法</th><th>用法用量</th></tr></thead>
         <tbody>
         {% for item in items %}
-            <tr><td>{{ item.herb.name }}</td><td>{{ item.dose }}{{ item.unit }}</td><td>{{ item.decoction|default:'-' }}</td><td>{{ item.usage|default:'-' }}</td></tr>
+            <tr><td><strong>{{ item.herb.name }}</strong>{% if item.herb.processing %}（{{ item.herb.processing }}）{% endif %}</td><td>{{ item.dose }}{{ item.unit }}</td><td>{{ item.decoction|default:'-' }}</td><td>{{ item.usage|default:'-' }}</td></tr>
         {% empty %}
             <tr><td colspan="4" class="text-muted">暂无药味</td></tr>
         {% endfor %}

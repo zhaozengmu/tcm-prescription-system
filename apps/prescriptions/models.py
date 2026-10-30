@@ -207,6 +207,9 @@ class Prescription(models.Model):
     decoction_note = models.CharField("代煎备注", max_length=200, blank=True)
     pickup_time = models.DateTimeField("取药时间", null=True, blank=True)
     pickup_person = models.CharField("取药人", max_length=64, blank=True)
+    # 打印/医嘱字段
+    total_doses = models.IntegerField("剂数", default=1)
+    dosage_note = models.CharField("服用医嘱", max_length=200, blank=True, default="遵医嘱，每日一剂，水煎分两次温服。")
     version = models.IntegerField("版本号（乐观锁）", default=1)
     is_deleted = models.BooleanField("逻辑删除", default=False)
     created_at = models.DateTimeField("创建时间", auto_now_add=True, db_index=True)

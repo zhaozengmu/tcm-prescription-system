@@ -1,30 +1,39 @@
 {% extends "base.html" %}
-{% block title %}管理驾驶舱{% endblock %}
+{% block title %}管理驾驶舱 - TCM-RMS{% endblock %}
 {% block content %}
-<h4 class="mb-3">📊 管理驾驶舱</h4>
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h4 class="mb-0 section-title">管理驾驶舱</h4>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="/api/v1/export/prescriptions" class="btn btn-sm btn-outline-brand">⬇ 导出处方</a>
+        <a href="/api/v1/export/herbs" class="btn btn-sm btn-outline-brand">⬇ 导出药材台账</a>
+        <a href="/api/v1/export/reviews" class="btn btn-sm btn-outline-brand">⬇ 导出审核记录</a>
+        <a href="/api/v1/export/logs" class="btn btn-sm btn-outline-secondary">⬇ 导出日志</a>
+    </div>
+</div>
+
 <div class="row g-3 mb-4">
-    <div class="col-md-3">
-        <div class="card p-3 stat-card">
-            <div class="text-muted">今日处方数</div>
-            <div class="value text-success">{{ today_presc }}</div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card green">
+            <div class="label">今日处方数</div>
+            <div class="value">{{ today_presc }}</div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card p-3 stat-card">
-            <div class="text-muted">待审核处方</div>
-            <div class="value text-warning">{{ pending_review }}</div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card orange">
+            <div class="label">待审核处方</div>
+            <div class="value">{{ pending_review }}</div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card p-3 stat-card">
-            <div class="text-muted">审核退回数</div>
-            <div class="value text-danger">{{ rejected }}</div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card red">
+            <div class="label">审核退回数</div>
+            <div class="value">{{ rejected }}</div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card p-3 stat-card">
-            <div class="text-muted">累计处方数</div>
-            <div class="value text-primary">{{ total_presc }}</div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card blue">
+            <div class="label">累计处方数</div>
+            <div class="value">{{ total_presc }}</div>
         </div>
     </div>
 </div>
@@ -32,18 +41,18 @@
 <div class="row g-3">
     <div class="col-md-6">
         <div class="card p-3">
-            <h6>近 7 日处方量趋势</h6>
+            <h6 class="section-title">近 7 日处方量趋势</h6>
             <div id="trendChart" style="height:260px;"></div>
         </div>
     </div>
     <div class="col-md-6">
         <div class="card p-3">
-            <h6>医师工作量排名 Top 10</h6>
-            <table class="table table-sm table-striped">
+            <h6 class="section-title">医师工作量排名 Top 10</h6>
+            <table class="table table-sm table-hover">
                 <thead><tr><th>医师</th><th>处方数</th></tr></thead>
                 <tbody>
                 {% for d in doctor_rank %}
-                    <tr><td>{{ d.doctor__user__first_name|default:d.doctor__user__username }}</td><td>{{ d.cnt }}</td></tr>
+                    <tr><td>{{ d.doctor__user__first_name|default:d.doctor__user__username }}</td><td><span class="badge badge-status bg-light text-dark">{{ d.cnt }}</span></td></tr>
                 {% empty %}
                     <tr><td colspan="2" class="text-muted">暂无数据</td></tr>
                 {% endfor %}
@@ -51,10 +60,10 @@
             </table>
         </div>
     </div>
-    <div class="col-md-12">
+    <div class="col-md-6">
         <div class="card p-3">
-            <h6>药材消耗 Top 10（按总剂量）</h6>
-            <table class="table table-sm table-striped">
+            <h6 class="section-title">药材消耗 Top 10（按总剂量）</h6>
+            <table class="table table-sm table-hover">
                 <thead><tr><th>药材</th><th>总剂量(g)</th></tr></thead>
                 <tbody>
                 {% for h in herb_top %}
@@ -68,12 +77,12 @@
     </div>
     <div class="col-md-6">
         <div class="card p-3">
-            <h6>审核驳回原因统计 Top 10</h6>
-            <table class="table table-sm table-striped">
+            <h6 class="section-title">审核驳回原因统计 Top 10</h6>
+            <table class="table table-sm table-hover">
                 <thead><tr><th>驳回原因</th><th>次数</th></tr></thead>
                 <tbody>
                 {% for r in reject_reasons %}
-                    <tr><td>{{ r.reject_reason }}</td><td>{{ r.cnt }}</td></tr>
+                    <tr><td>{{ r.reject_reason }}</td><td><span class="badge badge-status bg-danger-subtle text-danger">{{ r.cnt }}</span></td></tr>
                 {% empty %}
                     <tr><td colspan="2" class="text-muted">暂无驳回记录</td></tr>
                 {% endfor %}
@@ -81,31 +90,38 @@
             </table>
         </div>
     </div>
-    <div class="col-md-6">
+    <div class="col-md-12">
         <div class="card p-3">
-            <h6>⚠️ 库存与效期预警</h6>
-            {% if stock_shortage %}
-                <div class="mb-3">
-                    <div class="text-danger fw-bold mb-1">库存短缺（低于预警线）</div>
-                    <ul class="small mb-0">
-                    {% for h in stock_shortage %}
-                        <li>{{ h.name }}：库存 {{ h.stock }}kg，预警线 {{ h.stock_warning }}kg</li>
-                    {% endfor %}
-                    </ul>
+            <h6 class="section-title">⚠️ 库存与效期预警</h6>
+            {% if stock_shortage or near_expiry %}
+            <div class="row g-2">
+                {% if stock_shortage %}
+                <div class="col-md-6">
+                    <div class="alert alert-danger mb-0 py-2">
+                        <div class="fw-bold mb-1">🔴 库存短缺（低于预警线）</div>
+                        <ul class="small mb-0">
+                        {% for h in stock_shortage %}
+                            <li>{{ h.name }}：库存 {{ h.stock }}kg，预警线 {{ h.stock_warning }}kg</li>
+                        {% endfor %}
+                        </ul>
+                    </div>
                 </div>
-            {% endif %}
-            {% if near_expiry %}
-                <div>
-                    <div class="text-warning fw-bold mb-1">近效期药材（90 天内到期）</div>
-                    <ul class="small mb-0">
-                    {% for b in near_expiry %}
-                        <li>{{ b.herb.name }}（{{ b.batch_no }}）：{{ b.expire_at|date:"Y-m-d" }} 到期</li>
-                    {% endfor %}
-                    </ul>
+                {% endif %}
+                {% if near_expiry %}
+                <div class="col-md-6">
+                    <div class="alert alert-warning mb-0 py-2">
+                        <div class="fw-bold mb-1">🟠 近效期药材（90 天内到期）</div>
+                        <ul class="small mb-0">
+                        {% for b in near_expiry %}
+                            <li>{{ b.herb.name }}（{{ b.batch_no }}）：{{ b.expire_at|date:"Y-m-d" }} 到期</li>
+                        {% endfor %}
+                        </ul>
+                    </div>
                 </div>
-            {% endif %}
-            {% if not stock_shortage and not near_expiry %}
-                <div class="text-muted">当前无库存或效期预警</div>
+                {% endif %}
+            </div>
+            {% else %}
+                <div class="text-muted">✅ 当前无库存或效期预警</div>
             {% endif %}
         </div>
     </div>
@@ -119,9 +135,14 @@
     var dates = [{% for t in trend %}'{{ t.date }}',{% endfor %}];
     var counts = [{% for t in trend %}{{ t.count }},{% endfor %}];
     var option = {
-        xAxis: { type: 'category', data: dates },
-        yAxis: { type: 'value' },
-        series: [{ data: counts, type: 'line', smooth: true, areaStyle: {}, color: '#1a7f37' }],
+        xAxis: { type: 'category', data: dates, axisLine: { lineStyle: { color: '#cbd5d0' } } },
+        yAxis: { type: 'value', splitLine: { lineStyle: { color: '#eef2f0' } } },
+        series: [{
+            data: counts, type: 'line', smooth: true,
+            areaStyle: { color: 'rgba(26,138,92,.12)' },
+            lineStyle: { color: '#1a8a5c', width: 3 },
+            itemStyle: { color: '#1a8a5c' }
+        }],
         grid: { left: 40, right: 20, top: 20, bottom: 30 }
     };
     myChart.setOption(option);

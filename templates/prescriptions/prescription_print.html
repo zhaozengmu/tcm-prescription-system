@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>处方单 {{ prescription.presc_no }}</title>
+<style>
+    @page { size: A4; margin: 18mm 16mm; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: "SimSun", "Songti SC", serif; color: #1a1a1a; font-size: 14px; }
+    .presc-sheet { max-width: 190mm; margin: 0 auto; }
+    .head { text-align: center; border-bottom: 2px solid #1a8a5c; padding-bottom: 10px; margin-bottom: 16px; }
+    .head .hospital { font-size: 22px; font-weight: bold; letter-spacing: 2px; }
+    .head .sub { font-size: 12px; color: #555; margin-top: 3px; }
+    .presc-title { font-size: 18px; font-weight: bold; margin: 6px 0 2px; }
+    .meta { display: flex; flex-wrap: wrap; gap: 4px 24px; margin: 14px 0; font-size: 14px; }
+    .meta .item { min-width: 120px; }
+    .meta .item b { margin-right: 4px; }
+    table.herbs { width: 100%; border-collapse: collapse; margin: 8px 0 14px; }
+    table.herbs th, table.herbs td { border: 1px solid #333; padding: 7px 8px; text-align: center; font-size: 13px; }
+    table.herbs th { background: #eaf6ef; font-weight: bold; }
+    table.herbs td.l { text-align: left; }
+    .dosage { margin: 10px 0; font-size: 14px; line-height: 1.8; }
+    .review-box { border: 1px solid #999; border-radius: 6px; padding: 12px; margin: 12px 0; font-size: 13px; }
+    .review-box .rv { margin-bottom: 6px; }
+    .sign-row { display: flex; justify-content: space-between; margin-top: 30px; font-size: 14px; }
+    .sign-box { width: 30%; text-align: center; }
+    .sign-box .line { border-bottom: 1px solid #333; height: 40px; margin-bottom: 6px; }
+    .sign-box .label { color: #333; }
+    .footer { margin-top: 20px; font-size: 11px; color: #888; text-align: center; }
+    .no-print { text-align: center; margin: 20px 0; }
+    .no-print button { padding: 10px 28px; border: none; border-radius: 8px; background: #1a8a5c; color: #fff; font-size: 15px; cursor: pointer; }
+    @media print { .no-print { display: none; } }
+</style>
+</head>
+<body>
+<div class="presc-sheet">
+    <div class="head">
+        <div class="hospital">中医处方开具与审核管理系统</div>
+        <div class="sub">TCM-RMS · 中药处方笺（纸质留底）</div>
+        <div class="presc-title">中 药 处 方 单</div>
+    </div>
+
+    <div class="meta">
+        <span class="item"><b>处方编号：</b>{{ prescription.presc_no }}</span>
+        <span class="item"><b>姓名：</b>{{ prescription.patient.name }}</span>
+        <span class="item"><b>性别：</b>{{ prescription.patient.get_gender_display }}</span>
+        <span class="item"><b>年龄：</b>{{ prescription.patient.age|default:"-" }}</span>
+        <span class="item"><b>处方类型：</b>{{ prescription.get_presc_type_display }}</span>
+        <span class="item"><b>开方日期：</b>{{ prescription.created_at|date:"Y-m-d" }}</span>
+    </div>
+    <div class="meta">
+        <span class="item"><b>诊断：</b>{{ prescription.diagnosis|default:"-" }}</span>
+        <span class="item"><b>辨证：</b>{{ prescription.syndrome|default:"-" }}</span>
+        <span class="item"><b>开方医师：</b>{{ prescription.doctor.user.get_full_name|default:prescription.doctor.user.username }}</span>
+    </div>
+
+    <table class="herbs">
+        <thead>
+            <tr><th style="width:8%">序号</th><th style="width:22%">药材</th><th style="width:12%">剂量</th><th style="width:10%">单位</th><th style="width:24%">煎法</th><th style="width:24%">用法</th></tr>
+        </thead>
+        <tbody>
+        {% for item in items %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td class="l">{{ item.herb.name }}{% if item.herb.processing %}（{{ item.herb.processing }}）{% endif %}</td>
+                <td>{{ item.dose }}</td>
+                <td>{{ item.unit }}</td>
+                <td class="l">{{ item.decoction|default:"-" }}</td>
+                <td class="l">{{ item.usage|default:"-" }}</td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="6">暂无药味</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="dosage">
+        <div>剂数：共 <b>{{ prescription.total_doses|default:"1" }}</b> 剂</div>
+        <div>医嘱：{{ prescription.dosage_note|default:"遵医嘱，每日一剂，水煎分两次温服。" }}</div>
+        {% if prescription.presc_type == 'DECOCTION' or prescription.decoction_note %}
+        <div>代煎备注：{{ prescription.decoction_note|default:"-" }}</div>
+        {% endif %}
+    </div>
+
+    {% if reviews %}
+    <div class="review-box">
+        <div><b>审核记录：</b></div>
+        {% for rv in reviews %}
+        <div class="rv">
+            {{ rv.get_review_level_display }}｜审核人：{% if rv.pharmacist %}{{ rv.pharmacist.user.get_full_name|default:rv.pharmacist.user.username }}{% else %}-{% endif %}｜时间：{{ rv.created_at|date:"Y-m-d H:i" }}｜意见：{{ rv.review_opinion|default:"-" }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="sign-row">
+        <div class="sign-box"><div class="line"></div><div class="label">医师签名（盖章）</div></div>
+        <div class="sign-box"><div class="line"></div><div class="label">药师审核（盖章）</div></div>
+        <div class="sign-box"><div class="line"></div><div class="label">调配/发药（盖章）</div></div>
+    </div>
+
+    <div class="footer">本处方单由系统自动生成，仅供纸质留底存档</div>
+
+    <div class="no-print">
+        <button onclick="window.print()">🖨 打印 / 另存为 PDF</button>
+    </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>药材卡片 {{ herb.name }}</title>
+<style>
+    @page { size: A5; margin: 10mm; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background: #f0f4f2; padding: 20px; color: #1f2937; }
+    .card { max-width: 150mm; margin: 0 auto; background: #fff; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+    .card-head { background: linear-gradient(135deg, #1a8a5c, #27a06a); color: #fff; padding: 18px 22px; }
+    .card-head .name { font-size: 24px; font-weight: bold; }
+    .card-head .sub { font-size: 12px; opacity: .9; margin-top: 3px; }
+    .card-body { padding: 18px 22px; }
+    .row { display: flex; padding: 7px 0; border-bottom: 1px dashed #e5e9e7; font-size: 13px; }
+    .row:last-child { border-bottom: none; }
+    .row .k { width: 92px; color: #8a94a0; flex-shrink: 0; }
+    .row .v { flex: 1; }
+    .tag { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 12px; margin-right: 6px; }
+    .tag.toxic { background: #fdecec; color: #c0392b; }
+    .tag.short { background: #fff3e0; color: #e67e22; }
+    .batch-title { font-size: 14px; font-weight: bold; margin: 14px 0 8px; color: #1a8a5c; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    table th, table td { border: 1px solid #e5e9e7; padding: 6px; text-align: center; }
+    table th { background: #f0f7f3; }
+    .no-print { text-align: center; margin: 16px 0; }
+    .no-print button { padding: 9px 24px; border: none; border-radius: 8px; background: #1a8a5c; color: #fff; font-size: 14px; cursor: pointer; margin: 0 6px; }
+    .no-print a { display: inline-block; padding: 9px 24px; border-radius: 8px; background: #fff; color: #1a8a5c; border: 1px solid #1a8a5c; font-size: 14px; text-decoration: none; margin: 0 6px; }
+    @media print { body { background: #fff; padding: 0; } .no-print { display: none; } .card { box-shadow: none; } }
+</style>
+</head>
+<body>
+<div class="card">
+    <div class="card-head">
+        <div class="name">{{ herb.name }}</div>
+        <div class="sub">{{ herb.pinyin|default:"" }}{% if herb.pinyin_initial %} ｜ 首字母 {{ herb.pinyin_initial }}{% endif %}</div>
+    </div>
+    <div class="card-body">
+        <div class="row"><span class="k">道地产地</span><span class="v">{{ herb.origin|default:"-" }}</span></div>
+        <div class="row"><span class="k">炮制规格</span><span class="v">{{ herb.processing|default:"-" }}</span></div>
+        <div class="row"><span class="k">类别</span><span class="v">{{ herb.category|default:"-" }}</span></div>
+        <div class="row"><span class="k">性味归经</span><span class="v">{{ herb.property|default:"-" }}</span></div>
+        <div class="row"><span class="k">功效主治</span><span class="v">{{ herb.efficacy|default:"-" }}</span></div>
+        <div class="row"><span class="k">剂量上限</span><span class="v">{{ herb.max_dose|default:"-" }}g（常用 {{ herb.default_dose|default:"-" }}g）</span></div>
+        <div class="row">
+            <span class="k">状态标签</span>
+            <span class="v">
+                {% if herb.is_toxic %}<span class="tag toxic">毒性药材</span>{% endif %}
+                {% if herb.is_stock_shortage %}<span class="tag short">库存不足</span>{% endif %}
+                {% if not herb.is_toxic and not herb.is_stock_shortage %}<span class="text-muted">正常</span>{% endif %}
+            </span>
+        </div>
+        <div class="row"><span class="k">当前库存</span><span class="v">{{ herb.stock }} kg（预警线 {{ herb.stock_warning }} kg）</span></div>
+
+        {% if batches %}
+        <div class="batch-title">入库批次记录</div>
+        <table>
+            <thead><tr><th>批次号</th><th>供应商</th><th>入库时间</th><th>有效期至</th><th>数量(kg)</th></tr></thead>
+            <tbody>
+            {% for b in batches %}
+            <tr>
+                <td>{{ b.batch_no }}</td>
+                <td>{{ b.supplier.name|default:"-" }}</td>
+                <td>{{ b.inbound_at|date:"Y-m-d"|default:"-" }}</td>
+                <td>{{ b.expire_at|date:"Y-m-d"|default:"-" }}</td>
+                <td>{{ b.quantity }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+    </div>
+</div>
+
+<div class="no-print">
+    <button onclick="window.print()">🖨 打印 / 存为 PDF</button>
+    <a href="{% url 'prescriptions:herb_card_pdf' herb.pk %}">⬇ 导出 PDF</a>
+</div>
+</body>
+</html>

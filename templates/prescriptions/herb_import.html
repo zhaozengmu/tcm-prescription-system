@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}药材批量导入 - TCM-RMS{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white"><h5 class="mb-0">📥 药材字典 Excel 批量导入</h5></div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label">选择 Excel 文件（.xlsx）</label>
+                        <input type="file" name="file" class="form-control" accept=".xlsx" required>
+                    </div>
+                    <button class="btn btn-brand">开始导入</button>
+                    <a href="{% url 'prescriptions:herb_list' %}" class="btn btn-outline-secondary">返回列表</a>
+                </form>
+                <hr>
+                <h6 class="text-muted">Excel 表头格式（首行为列名）</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered small">
+                        <thead class="table-light"><tr>
+                            <th>药材名称</th><th>拼音</th><th>拼音首字母</th><th>类别</th><th>性味归经</th><th>功效主治</th><th>道地产地</th><th>炮制规格</th><th>剂量上限</th><th>毒性</th><th>常用剂量</th><th>单位</th><th>库存</th><th>预警线</th>
+                        </tr></thead>
+                        <tbody><tr>
+                            <td>甘草</td><td>gan cao</td><td>GC</td><td>补气药</td><td>甘平，归心</td><td>补脾益气</td><td>内蒙古</td><td>生甘草</td><td>10</td><td>否</td><td>3</td><td>g</td><td>50</td><td>10</td>
+                        </tr></tbody>
+                    </table>
+                </div>
+                <p class="text-muted small mb-0">说明：药材名称必填；拼音首字母可留空由系统自动补全；毒性列填「是/否」。</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
