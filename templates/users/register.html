@@ -1,43 +1,179 @@
-{% extends "base.html" %}
-{% block title %}注册 - 中医处方管理系统{% endblock %}
-{% block content %}
-<div class="row justify-content-center mt-4">
-    <div class="col-md-5">
-        <div class="card p-4">
-            <h4 class="text-center mb-4">🌿 注册新账号</h4>
-            <form method="post">
-                {% csrf_token %}
-                <div class="mb-3">
-                    <label class="form-label">用户名 <span class="text-danger">*</span></label>
-                    <input type="text" name="username" class="form-control" placeholder="登录账号，如 zhangsan" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">姓名 <span class="text-danger">*</span></label>
-                    <input type="text" name="full_name" class="form-control" placeholder="真实姓名" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">联系电话</label>
-                    <input type="text" name="phone" class="form-control" placeholder="选填">
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">密码 <span class="text-danger">*</span></label>
-                    <input type="password" name="password" class="form-control" placeholder="至少 6 位" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">确认密码 <span class="text-danger">*</span></label>
-                    <input type="password" name="password2" class="form-control" placeholder="再次输入密码" required>
-                </div>
-                <button type="submit" class="btn btn-success w-100">注册</button>
-            </form>
-            <hr>
-            <div class="text-center small">
-                已有账号？<a href="{% url 'users:login' %}">去登录</a>
+{% load static %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>注册 - TCM-RMS 中医处方开具与审核管理系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #06281e 0%, #0c4534 45%, #17714f 100%);
+            font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+            padding: 20px;
+        }
+        .register-card {
+            width: 100%;
+            max-width: 420px;
+            background: #fff;
+            border-radius: 22px;
+            padding: 40px 48px 32px;
+            text-align: center;
+        }
+        .logo {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 14px;
+            background: linear-gradient(135deg, #2ba871, #1a8a5c);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .title {
+            font-size: 26px;
+            font-weight: 700;
+            color: #1f2937;
+            letter-spacing: 1px;
+        }
+        .subtitle {
+            font-size: 13px;
+            color: #8a94a0;
+            margin: 6px 0 24px;
+        }
+        .field { text-align: left; margin-bottom: 14px; }
+        .field label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 6px;
+        }
+        .field label .req { color: #e74c3c; }
+        .field input {
+            width: 100%;
+            height: 44px;
+            border: 1px solid #d8dee4;
+            border-radius: 12px;
+            padding: 0 14px;
+            font-size: 14px;
+            color: #1f2937;
+            outline: none;
+            transition: border-color .2s, box-shadow .2s;
+        }
+        .field input:focus {
+            border-color: #2ba871;
+            box-shadow: 0 0 0 3px rgba(43, 168, 113, .15);
+        }
+        .field input::placeholder { color: #b6bdc5; }
+        .btn-register {
+            width: 100%;
+            height: 46px;
+            margin-top: 8px;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #27a06a, #1a8a5c);
+            color: #fff;
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: 8px;
+            cursor: pointer;
+            transition: opacity .2s;
+        }
+        .btn-register:hover { opacity: .9; }
+        .login-link {
+            margin-top: 14px;
+            font-size: 13px;
+            color: #8a94a0;
+        }
+        .login-link a {
+            color: #1a8a5c;
+            font-weight: 600;
+            text-decoration: none;
+        }
+        .login-link a:hover { text-decoration: underline; }
+        .role-note {
+            margin-top: 16px;
+            font-size: 12px;
+            color: #b6bdc5;
+            line-height: 1.8;
+        }
+        .alert-msg {
+            background: #fdecec;
+            border: 1px solid #f5c2c2;
+            color: #c0392b;
+            font-size: 13px;
+            border-radius: 10px;
+            padding: 9px 12px;
+            margin-bottom: 14px;
+            text-align: left;
+        }
+        .alert-ok {
+            background: #e9f7ef;
+            border: 1px solid #bfe8d0;
+            color: #1a8a5c;
+            font-size: 13px;
+            border-radius: 10px;
+            padding: 9px 12px;
+            margin-bottom: 14px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <div class="register-card">
+        <div class="logo">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+                <rect x="9.2" y="2.6" width="8" height="15" rx="4" transform="rotate(45 9.2 2.6)" fill="#ffffff"/>
+                <rect x="11.2" y="9.4" width="4" height="7.5" transform="rotate(45 11.2 9.4)" fill="#1a8a5c"/>
+            </svg>
+        </div>
+        <div class="title">注册新账号</div>
+        <div class="subtitle">中医处方开具与审核管理系统</div>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert-msg">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+            <div class="field">
+                <label for="username">用户名 <span class="req">*</span></label>
+                <input type="text" id="username" name="username" placeholder="请输入登录账号" required>
             </div>
-            <div class="small text-muted mt-2">
-                说明：公开注册默认为<b>患者</b>角色，可查询本人处方；
-                医师、药师账号须由系统管理员在后台分配。
+            <div class="field">
+                <label for="full_name">姓名 <span class="req">*</span></label>
+                <input type="text" id="full_name" name="full_name" placeholder="请输入真实姓名" required>
             </div>
+            <div class="field">
+                <label for="phone">联系电话</label>
+                <input type="text" id="phone" name="phone" placeholder="选填">
+            </div>
+            <div class="field">
+                <label for="password">密码 <span class="req">*</span></label>
+                <input type="password" id="password" name="password" placeholder="至少 6 位" required>
+            </div>
+            <div class="field">
+                <label for="password2">确认密码 <span class="req">*</span></label>
+                <input type="password" id="password2" name="password2" placeholder="请再次输入密码" required>
+            </div>
+            <button type="submit" class="btn-register">注册</button>
+        </form>
+
+        <div class="login-link">
+            已有账号？<a href="{% url 'users:login' %}">去登录</a>
+        </div>
+
+        <div class="role-note">
+            注册默认为「患者」角色，可查询本人处方<br>
+            医师、药师账号须由系统管理员分配
         </div>
     </div>
-</div>
-{% endblock %}
+</body>
+</html>

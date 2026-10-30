@@ -225,11 +225,11 @@ class Command(BaseCommand):
         """创建演示账号（仅用于课程实训，模拟数据）。"""
         accounts = [
             # (username, password, name, role_code, is_doctor, is_pharmacist)
-            ("admin", "Admin@123", "系统管理员", "admin", False, False),
-            ("doctor1", "Doctor@123", "陈志明", "doctor", True, False),
-            ("doctor2", "Doctor@123", "王玉晨", "doctor", True, False),
-            ("pharmacist1", "Pharm@123", "雷婧怡", "pharmacist", False, True),
-            ("patient1", "Patient@123", "张三", "patient", False, False),
+            ("admin1", "rx123456", "系统管理员", "admin", False, False),
+            ("doctor1", "rx123456", "陈志明", "doctor", True, False),
+            ("doctor2", "rx123456", "王玉晨", "doctor", True, False),
+            ("pharmacist1", "rx123456", "雷婧怡", "pharmacist", False, True),
+            ("patient1", "rx123456", "张三", "patient", False, False),
         ]
 
         for username, password, name, role_code, is_doctor, is_pharmacist in accounts:
@@ -254,4 +254,4 @@ class Command(BaseCommand):
                 )
 
         self.stdout.write(self.style.SUCCESS("演示账号创建完成"))
-        self.stdout.write(self.style.WARNING("演示账号：admin/Admin@123, doctor1/Doctor@123, pharmacist1/Pharm@123"))
+        self.stdout.write(self.style.WARNING("演示账号：admin1 / doctor1 / pharmacist1 / patient1，密码统一 rx123456"))

@@ -14,17 +14,10 @@ from .permissions import has_permission, get_client_ip
 
 
 def login_view(request):
-    """账号密码登录，带图形验证码与失败锁定。"""
+    """账号密码登录，带登录失败锁定。"""
     if request.method == "POST":
         username = request.POST.get("username", "").strip()
         password = request.POST.get("password", "")
-        captcha = request.POST.get("captcha", "").strip()
-
-        # 图形验证码校验（演示简化：固定验证码 demo，生产需接入真实图形验证码）
-        session_captcha = request.session.get("captcha", "demo")
-        if captcha.lower() != session_captcha.lower():
-            messages.error(request, "验证码错误")
-            return render(request, "users/login.html")
 
         user = User.objects.filter(username=username).first()
         if user and user.locked_until and user.locked_until > timezone.now():
