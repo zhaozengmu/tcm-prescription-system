@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}注册 - 中医处方管理系统{% endblock %}
+{% block content %}
+<div class="row justify-content-center mt-4">
+    <div class="col-md-5">
+        <div class="card p-4">
+            <h4 class="text-center mb-4">🌿 注册新账号</h4>
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label">用户名 <span class="text-danger">*</span></label>
+                    <input type="text" name="username" class="form-control" placeholder="登录账号，如 zhangsan" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">姓名 <span class="text-danger">*</span></label>
+                    <input type="text" name="full_name" class="form-control" placeholder="真实姓名" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">联系电话</label>
+                    <input type="text" name="phone" class="form-control" placeholder="选填">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">密码 <span class="text-danger">*</span></label>
+                    <input type="password" name="password" class="form-control" placeholder="至少 6 位" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">确认密码 <span class="text-danger">*</span></label>
+                    <input type="password" name="password2" class="form-control" placeholder="再次输入密码" required>
+                </div>
+                <button type="submit" class="btn btn-success w-100">注册</button>
+            </form>
+            <hr>
+            <div class="text-center small">
+                已有账号？<a href="{% url 'users:login' %}">去登录</a>
+            </div>
+            <div class="small text-muted mt-2">
+                说明：公开注册默认为<b>患者</b>角色，可查询本人处方；
+                医师、药师账号须由系统管理员在后台分配。
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
